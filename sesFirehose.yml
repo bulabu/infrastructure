@@ -62,12 +62,8 @@ Resources:
             Action:
               - '*'
             Resource: !Ref OpenSearchDomainArn
-          - Effect: Allow
-            Action:
-              - 'firehose:*'
-            Resource: !GetAtt SesStream.Arn
       Roles:
-        - !Ref DeliveryRole
+        - !Ref FirehoseRole
   DeliveryRole:
     Type: AWS::IAM::Role
     Properties:
