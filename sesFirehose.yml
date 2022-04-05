@@ -26,8 +26,6 @@ Resources:
       DeliveryStreamName: "ses-stream"
       DeliveryStreamType: "DirectPut"
       AmazonopensearchserviceDestinationConfiguration:
-        BufferingHints:
-          IntervalInSeconds: 20
         DomainARN: !Ref OpenSearchDomainArn
         IndexName: "sesmessages"
         RoleARN: !GetAtt DeliveryRole.Arn
@@ -35,7 +33,7 @@ Resources:
         S3Configuration:
           BucketARN: !GetAtt FirehoseBucket.Arn
           BufferingHints:
-            IntervalInSeconds: 30
+            IntervalInSeconds: 60
             SizeInMBs: '50'
           RoleARN: !GetAtt DeliveryRole.Arn
   DeliveryRole:
