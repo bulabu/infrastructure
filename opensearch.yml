@@ -1,0 +1,375 @@
+AWSTemplateFormatVersion: "2010-09-09"
+Metadata:
+  Generator: "former2"
+Description: ""
+Resources:
+  OpenSearchServiceDomain:
+    Type: "AWS::OpenSearchService::Domain"
+    Properties:
+      DomainName: !Sub "${CognitoUserPoolDomain}email"
+      EngineVersion: "OpenSearch_1.1"
+      ClusterConfig:
+        ColdStorageOptions:
+          Enabled: false
+        DedicatedMasterEnabled: false
+        InstanceCount: 1
+        InstanceType: "t3.small.elasticsearch"
+        ZoneAwarenessEnabled: false
+        WarmEnabled: false
+      AccessPolicies: !Sub "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"*\"},\"Action\":\"es:*\",\"Resource\":\"arn:aws:es:${AWS::Region}:${AWS::AccountId}:domain/${CognitoUserPoolDomain}email/*\"},{\"Effect\":\"Allow\",\"Principal\":{\"AWS\":\"arn:aws:iam::${AWS::AccountId}:role/${IAMRole}\"},\"Action\":\"es:ESHttp*\",\"Resource\":\"arn:aws:es:region:${AWS::AccountId}:domain/${CognitoUserPoolDomain}email/*\"}]}"
+      SnapshotOptions: {}
+      snapshot_options: {}
+      EncryptionAtRestOptions:
+        Enabled: true
+        KmsKeyId: !Sub "arn:aws:kms:${AWS::Region}:${AWS::AccountId}:key/df4d9fc2-c531-480f-9106-ab92846e3ed1"
+      NodeToNodeEncryptionOptions:
+        Enabled: true
+      AdvancedOptions:
+        "indices.fielddata.cache.size": "20"
+        "indices.query.bool.max_clause_count": "1024"
+        override_main_response_version: "false"
+        "rest.action.multi.allow_explicit_index": "true"
+      EBSOptions:
+        EBSEnabled: true
+        VolumeType: "gp2"
+        VolumeSize: 50
+      CognitoOptions:
+        Enabled: true
+        UserPoolId: !Ref CognitoUserPool
+        IdentityPoolId: !Sub "${AWS::Region}:8159c967-175f-466b-9ba4-62fa5ffb6f76"
+        RoleArn: !Sub "arn:aws:iam::${AWS::AccountId}:role/service-role/CognitoAccessForAmazonOpenSearch"
+      DomainEndpointOptions:
+        EnforceHTTPS: true
+        TLSSecurityPolicy: "Policy-Min-TLS-1-0-2019-07"
+        CustomEndpointEnabled: false
+      AdvancedSecurityOptions:
+        Enabled: true
+        InternalUserDatabaseEnabled: false
+        AnonymousAuthEnabled: false
+
+  IAMRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: "Cognito_SesDashboardAuth_Role"
+      AssumeRolePolicyDocument: !Sub "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Federated\":\"cognito-identity.amazonaws.com\"},\"Action\":\"sts:AssumeRoleWithWebIdentity\",\"Condition\":{\"StringEquals\":{\"cognito-identity.amazonaws.com:aud\":\"${AWS::Region}:8159c967-175f-466b-9ba4-62fa5ffb6f76\"},\"ForAnyValue:StringLike\":{\"cognito-identity.amazonaws.com:amr\":\"authenticated\"}}}]}"
+      MaxSessionDuration: 3600
+
+  IAMRole2:
+    Type: "AWS::IAM::Role"
+    Properties:
+      Path: "/"
+      RoleName: "Cognito_SesDashboardUnauth_Role"
+      AssumeRolePolicyDocument: !Sub "{\"Version\":\"2012-10-17\",\"Statement\":[{\"Effect\":\"Allow\",\"Principal\":{\"Federated\":\"cognito-identity.amazonaws.com\"},\"Action\":\"sts:AssumeRoleWithWebIdentity\",\"Condition\":{\"StringEquals\":{\"cognito-identity.amazonaws.com:aud\":\"${AWS::Region}:8159c967-175f-466b-9ba4-62fa5ffb6f76\"},\"ForAnyValue:StringLike\":{\"cognito-identity.amazonaws.com:amr\":\"unauthenticated\"}}}]}"
+      MaxSessionDuration: 3600
+
+  CognitoIdentityPool:
+    Type: "AWS::Cognito::IdentityPool"
+    Properties:
+      IdentityPoolName: "Ses Dashboard"
+      AllowUnauthenticatedIdentities: false
+      CognitoIdentityProviders:
+        -
+          ProviderName: !Sub "cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}"
+          ClientId: "27orfo1tcsjjap3ma040b81tk0"
+          ServerSideTokenCheck: false
+        -
+          ProviderName: !Sub "cognito-idp.${AWS::Region}.amazonaws.com/${CognitoUserPool}"
+          ClientId: "5am5g17vvh1eu38p1h3lthrrnr"
+          ServerSideTokenCheck: false
+
+  CognitoIdentityPoolRoleAttachment:
+    Type: "AWS::Cognito::IdentityPoolRoleAttachment"
+    Properties:
+      IdentityPoolId: !Sub "${AWS::Region}:8159c967-175f-466b-9ba4-62fa5ffb6f76"
+      Roles:
+        authenticated: !GetAtt IAMRole.Arn
+        unauthenticated: !GetAtt IAMRole2.Arn
+
+  CognitoUserPool:
+    Type: "AWS::Cognito::UserPool"
+    Properties:
+      UserPoolName: "ses-dashboard-users"
+      Policies:
+        PasswordPolicy:
+          MinimumLength: 8
+          RequireUppercase: true
+          RequireLowercase: true
+          RequireNumbers: true
+          RequireSymbols: true
+          TemporaryPasswordValidityDays: 7
+      LambdaConfig: {}
+      Schema:
+        -
+          Name: "sub"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: false
+          Required: true
+          StringAttributeConstraints:
+            MinLength: "1"
+            MaxLength: "2048"
+        -
+          Name: "name"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "given_name"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "family_name"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "middle_name"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "nickname"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "preferred_username"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "profile"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "picture"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "website"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "email"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: true
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "email_verified"
+          AttributeDataType: "Boolean"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+        -
+          Name: "gender"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "birthdate"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "10"
+            MaxLength: "10"
+        -
+          Name: "zoneinfo"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "locale"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "phone_number"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "phone_number_verified"
+          AttributeDataType: "Boolean"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+        -
+          Name: "address"
+          AttributeDataType: "String"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          StringAttributeConstraints:
+            MinLength: "0"
+            MaxLength: "2048"
+        -
+          Name: "updated_at"
+          AttributeDataType: "Number"
+          DeveloperOnlyAttribute: false
+          Mutable: true
+          Required: false
+          NumberAttributeConstraints:
+            MinValue: "0"
+      AutoVerifiedAttributes:
+        - "email"
+      MfaConfiguration: "OFF"
+      EmailConfiguration:
+        EmailSendingAccount: "COGNITO_DEFAULT"
+      AdminCreateUserConfig:
+        AllowAdminCreateUserOnly: true
+      UserPoolTags: {}
+      AccountRecoverySetting: {}
+      VerificationMessageTemplate:
+        DefaultEmailOption: "CONFIRM_WITH_CODE"
+
+  CognitoUserPoolClient:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: !Sub "AmazonOpenSearchService-${OpenSearchServiceDomain}-${AWS::Region}-67bwnufecbkywcqo3ajujayjem"
+      RefreshTokenValidity: 30
+      GenerateSecret: true
+      SupportedIdentityProviders:
+        - "COGNITO"
+      CallbackURLs:
+        - !Sub "https://search-${OpenSearchServiceDomain}-67bwnufecbkywcqo3ajujayjem.${AWS::Region}.es.amazonaws.com/_dashboards/app/home"
+      LogoutURLs:
+        - !Sub "https://search-${OpenSearchServiceDomain}-67bwnufecbkywcqo3ajujayjem.${AWS::Region}.es.amazonaws.com/_dashboards/app/home"
+      AllowedOAuthFlows:
+        - "code"
+      AllowedOAuthScopes:
+        - "email"
+        - "openid"
+        - "phone"
+        - "profile"
+      AllowedOAuthFlowsUserPoolClient: true
+      TokenValidityUnits: {}
+
+  CognitoUserPoolClient2:
+    Type: "AWS::Cognito::UserPoolClient"
+    Properties:
+      UserPoolId: !Ref CognitoUserPool
+      ClientName: "sesDashboards"
+      RefreshTokenValidity: 30
+      ReadAttributes:
+        - "address"
+        - "birthdate"
+        - "email"
+        - "email_verified"
+        - "family_name"
+        - "gender"
+        - "given_name"
+        - "locale"
+        - "middle_name"
+        - "name"
+        - "nickname"
+        - "phone_number"
+        - "phone_number_verified"
+        - "picture"
+        - "preferred_username"
+        - "profile"
+        - "updated_at"
+        - "website"
+        - "zoneinfo"
+      WriteAttributes:
+        - "address"
+        - "birthdate"
+        - "email"
+        - "family_name"
+        - "gender"
+        - "given_name"
+        - "locale"
+        - "middle_name"
+        - "name"
+        - "nickname"
+        - "phone_number"
+        - "picture"
+        - "preferred_username"
+        - "profile"
+        - "updated_at"
+        - "website"
+        - "zoneinfo"
+      ExplicitAuthFlows:
+        - "ALLOW_ADMIN_USER_PASSWORD_AUTH"
+        - "ALLOW_CUSTOM_AUTH"
+        - "ALLOW_REFRESH_TOKEN_AUTH"
+        - "ALLOW_USER_PASSWORD_AUTH"
+        - "ALLOW_USER_SRP_AUTH"
+      GenerateSecret: true
+      PreventUserExistenceErrors: "ENABLED"
+      AllowedOAuthFlowsUserPoolClient: false
+      IdTokenValidity: 60
+      AccessTokenValidity: 60
+      TokenValidityUnits:
+        AccessToken: "minutes"
+        IdToken: "minutes"
+        RefreshToken: "days"
+
+  CognitoUserPoolDomain:
+    Type: "AWS::Cognito::UserPoolDomain"
+    Properties:
+      Domain: "assurex"
+      UserPoolId: !Ref CognitoUserPool

@@ -1,0 +1,80 @@
+AWSTemplateFormatVersion: 2010-09-09
+Resources:
+  VPC:
+    Type: AWS::EC2::VPC
+    Properties:
+      CidrBlock: 10.0.0.0/16
+      EnableDnsSupport: true
+      EnableDnsHostnames: true
+      InstanceTenancy: default
+      Tags:
+        - Key: Name
+          Value: AssurexVpc
+  InternetGateway:
+    Type: AWS::EC2::InternetGateway
+  VPCGatewayAttachment:
+    Type: AWS::EC2::VPCGatewayAttachment
+    Properties:
+      VpcId: !Ref VPC
+      InternetGatewayId: !Ref InternetGateway
+  SubnetA:
+    Type: AWS::EC2::Subnet
+    Properties:
+      AvailabilityZone: us-west-2a
+      VpcId: !Ref VPC
+      CidrBlock: 10.0.0.0/24
+      MapPublicIpOnLaunch: true
+  RouteTable:
+    Type: AWS::EC2::RouteTable
+    Properties:
+      VpcId: !Ref VPC
+  InternetRoute:
+    Type: AWS::EC2::Route
+    DependsOn: InternetGateway
+    Properties:
+      DestinationCidrBlock: 0.0.0.0/0
+      GatewayId: !Ref InternetGateway
+      RouteTableId: !Ref RouteTable
+  SubnetARouteTableAssociation:
+    Type: AWS::EC2::SubnetRouteTableAssociation
+    Properties:
+      RouteTableId: !Ref RouteTable
+      SubnetId: !Ref SubnetA
+  CognitoRole:
+    Type: 'AWS::IAM::Role'
+    Properties:
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonOpenSearchServiceCognitoAccess"
+  CognitoIdentityPool:
+    Type:
+  OpenSearchServiceDomain:
+    Type: 'AWS::OpenSearchService::Domain'
+    Properties:
+      DomainName: 'assurexEmail'
+      ClusterConfig:
+        InstanceCount: '1'
+        InstanceType: 't3.small.search'
+      EBSOptions:
+        EBSEnabled: true
+        Iops: '0'
+        VolumeSize: '75'
+        VolumeType: 'standard'
+      AccessPolicies:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Deny
+            Principal:
+              AWS: '*'
+            Action: 'es:*'
+            Resource: '*'
+      AdvancedOptions:
+        rest.action.multi.allow_explicit_index: true
+        override_main_response_version: true
+      VPCOptions:
+        SubnetIds: !REF SubnetA
+        SecurityGroupIds: !REF
+#      CognitoOptions:
+#        Enabled: true
+#        IdentityPoolId: String
+#        RoleArn: String
+#        UserPoolId: String
