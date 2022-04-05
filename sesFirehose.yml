@@ -1,0 +1,92 @@
+AWSTemplateFormatVersion: 2010-09-09
+Parameters:
+  OpenSearchDomainArn:
+    Type: String
+    Default: arn:aws:es:us-west-2:187751159313:domain/assurexemail
+Resources:
+  FirehoseBucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      AccessControl: Private
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      VersioningConfiguration:
+        Status: Enabled
+      LifecycleConfiguration:
+        Rules:
+          - Id: DeleteOldData
+            Status: Enabled
+            ExpirationInDays: '7'
+  SesStream:
+    Type: AWS::KinesisFirehose::DeliveryStream
+    Properties:
+      DeliveryStreamName: "ses-stream"
+      DeliveryStreamType: "DirectPut"
+      AmazonopensearchserviceDestinationConfiguration:
+        BufferingHints:
+          IntervalInSeconds: 20
+        DomainARN: !Ref OpenSearchDomainArn
+        IndexName: "sesmessages"
+        RoleARN: !GetAtt DeliveryRole.Arn
+        S3BackupMode: "FailedDocumentsOnly"
+        S3Configuration:
+          BucketARN: !GetAtt FirehoseBucket.Arn
+          BufferingHints:
+            IntervalInSeconds: 30
+            SizeInMBs: '50'
+          RoleARN: !GetAtt DeliveryRole.Arn
+  DeliveryRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref 'AWS::AccountId'
+  DeliveryPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: firehose-delivery-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - 's3:AbortMultipartUpload'
+              - 's3:GetBucketLocation'
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:ListBucketMultipartUploads'
+              - 's3:PutObject'
+            Resource:
+              - !Sub "arn:aws:s3:::${FirehoseBucket}"
+              - !Sub "arn:aws:s3:::${FirehoseBucket}*"
+          - Effect: Allow
+            Action:
+              - 'kinesis:DescribeStream'
+              - 'kinesis:GetShardIterator'
+              - 'kinesis:GetRecords'
+            Resource: !GetAtt SesStream.Arn
+          - Effect: Allow
+            Action:
+              - 'es:ESHttpPost'
+              - 'es:ESHttpPut'
+              - 'logs:CreateLogGroup'
+              - 'logs:CreateLogStream'
+              - 'logs:PutLogEvents'
+              - 'kinesis:GetShardIterator'
+              - 'kinesis:GetRecords'
+              - 'kinesis:DescribeStream'
+              - 'kinesis:ListStreams'
+      Roles:
+        - !Ref DeliveryRole
+
