@@ -28,7 +28,7 @@ Resources:
       AmazonopensearchserviceDestinationConfiguration:
         DomainARN: !Ref OpenSearchDomainArn
         IndexName: "sesmessages"
-        RoleARN: !GetAtt DeliveryRole.Arn
+        RoleARN: !GetAtt FirehoseRole.Arn
         S3BackupMode: "FailedDocumentsOnly"
         S3Configuration:
           BucketARN: !GetAtt FirehoseBucket.Arn
@@ -36,6 +36,38 @@ Resources:
             IntervalInSeconds: 60
             SizeInMBs: '50'
           RoleARN: !GetAtt DeliveryRole.Arn
+    DependsOn: FirehoseRole
+  FirehoseRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Sid: ''
+            Effect: Allow
+            Principal:
+              Service: firehose.amazonaws.com
+            Action: 'sts:AssumeRole'
+            Condition:
+              StringEquals:
+                'sts:ExternalId': !Ref 'AWS::AccountId'
+  FirehosePolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: opensearch-delivery-policy
+      PolicyDocument:
+        Version: 2012-10-17
+        Statement:
+          - Effect: Allow
+            Action:
+              - '*'
+            Resource: !Ref OpenSearchDomainArn
+          - Effect: Allow
+            Action:
+              - 'firehose:*'
+            Resource: !GetAtt SesStream.Arn
+      Roles:
+        - !Ref DeliveryRole
   DeliveryRole:
     Type: AWS::IAM::Role
     Properties:
@@ -70,21 +102,33 @@ Resources:
               - !Sub "arn:aws:s3:::${FirehoseBucket}*"
           - Effect: Allow
             Action:
-              - 'kinesis:DescribeStream'
-              - 'kinesis:GetShardIterator'
-              - 'kinesis:GetRecords'
-            Resource: !GetAtt SesStream.Arn
-          - Effect: Allow
-            Action:
-              - 'es:ESHttpPost'
-              - 'es:ESHttpPut'
-              - 'logs:CreateLogGroup'
-              - 'logs:CreateLogStream'
-              - 'logs:PutLogEvents'
               - 'kinesis:GetShardIterator'
               - 'kinesis:GetRecords'
               - 'kinesis:DescribeStream'
               - 'kinesis:ListStreams'
+            Resource: !GetAtt SesStream.Arn
+          - Effect: Allow
+            Action:
+              - '*'
+            Resource: !Ref OpenSearchDomainArn
+          - Effect: Allow
+            Action:
+              - 'firehose:*'
+            Resource: !GetAtt SesStream.Arn
       Roles:
         - !Ref DeliveryRole
-
+  ConfigSet:
+    Type: 'AWS::SES::ConfigurationSet'
+    Properties:
+      Name: 'TrackingSet'
+  OpensearchEventDestination:
+    Type: 'AWS::SES::ConfigurationSetEventDestination'
+    Properties:
+      ConfigurationSetName: !Ref ConfigSet
+      EventDestination:
+        Name: 'OpensearchTrackingDest'
+        Enabled: true
+        KinesisFirehoseDestination:
+          DeliveryStreamARN: !GetAtt SesStream.Arn
+          IAMRoleARN: !GetAtt DeliveryRole.Arn
+    DependsOn: SesStream
