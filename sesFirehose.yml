@@ -36,7 +36,9 @@ Resources:
             IntervalInSeconds: 60
             SizeInMBs: '50'
           RoleARN: !GetAtt DeliveryRole.Arn
-    DependsOn: FirehoseRole
+    DependsOn:
+      - FirehoseRole
+      - FirehosePolicy
   FirehoseRole:
     Type: AWS::IAM::Role
     Properties:
@@ -48,9 +50,6 @@ Resources:
             Principal:
               Service: firehose.amazonaws.com
             Action: 'sts:AssumeRole'
-            Condition:
-              StringEquals:
-                'sts:ExternalId': !Ref 'AWS::AccountId'
   FirehosePolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -60,8 +59,19 @@ Resources:
         Statement:
           - Effect: Allow
             Action:
-              - '*'
-            Resource: !Ref OpenSearchDomainArn
+              - 'es:*'
+            Resource: 'arn:aws:es:us-west-2:187751159313:domain/assurexemail'
+          - Effect: Allow
+            Action:
+              - 's3:AbortMultipartUpload'
+              - 's3:GetBucketLocation'
+              - 's3:GetObject'
+              - 's3:ListBucket'
+              - 's3:ListBucketMultipartUploads'
+              - 's3:PutObject'
+            Resource:
+              - !Sub "arn:aws:s3:::${FirehoseBucket}"
+              - !Sub "arn:aws:s3:::${FirehoseBucket}*"
       Roles:
         - !Ref FirehoseRole
   DeliveryRole:
@@ -70,14 +80,16 @@ Resources:
       AssumeRolePolicyDocument:
         Version: 2012-10-17
         Statement:
-          - Sid: ''
+          - Sid: 'firehose'
             Effect: Allow
             Principal:
               Service: firehose.amazonaws.com
             Action: 'sts:AssumeRole'
-            Condition:
-              StringEquals:
-                'sts:ExternalId': !Ref 'AWS::AccountId'
+          - Sid: 'ses'
+            Effect: Allow
+            Principal:
+              Service: ses.amazonaws.com
+            Action: 'sts:AssumeRole'
   DeliveryPolicy:
     Type: AWS::IAM::Policy
     Properties:
@@ -105,10 +117,6 @@ Resources:
             Resource: !GetAtt SesStream.Arn
           - Effect: Allow
             Action:
-              - '*'
-            Resource: !Ref OpenSearchDomainArn
-          - Effect: Allow
-            Action:
               - 'firehose:*'
             Resource: !GetAtt SesStream.Arn
       Roles:
@@ -124,7 +132,19 @@ Resources:
       EventDestination:
         Name: 'OpensearchTrackingDest'
         Enabled: true
+        MatchingEventTypes:
+          - send
+          - reject
+          - bounce
+          - complaint
+          - delivery
+          - open
+          - click
+          - renderingFailure
         KinesisFirehoseDestination:
           DeliveryStreamARN: !GetAtt SesStream.Arn
           IAMRoleARN: !GetAtt DeliveryRole.Arn
-    DependsOn: SesStream
+    DependsOn:
+      - SesStream
+      - DeliveryPolicy
+      - DeliveryRole
