@@ -8,6 +8,16 @@
       "Description": "Name of the base stack with all infra resources",
       "Type": "String",
       "Default": "basevpc"
+    },
+    "Image": {
+      "Description": "Image to run",
+      "Type": "String",
+      "Default": "960937490314.dkr.ecr.us-east-1.amazonaws.com/extractpipeline:latest"
+    },
+    "Command": {
+      "Description": "Command to run",
+      "Type": "String",
+      "Default": "java -cp /app/resources:/app/classes:/app/libs/* com.infinum.aviso.connect.connector.ConnectorApplication --logging.file=Ref::logfile --school.token=Ref::connectorToken"
     }
   },
   "Resources" : {
@@ -70,12 +80,20 @@
       "Properties" : {
         "Type" : "container",
         "ContainerProperties" : {
-          "Image" : { 
-	    "Fn::Join": [ "", [ "137112412989.dkr.ecr.", { "Ref" : "AWS::Region" }, ".amazonaws.com/amazonlinux:latest" ]] 
-	  },
+          "Image" : {"Fn::Sub" : "${Image}"},
           "Vcpus" : 1,
           "Memory" : 512,
-          "Command" : [ "echo", "Hello world" ]
+          "Command" : [{"Fn::Sub" : "${Command}"}],
+          "Environment": [
+            {
+              "Name": "logfile",
+              "Value": "/var/log/application.log"
+            },
+            {
+              "Name": "connectorToken",
+              "Value": "DEMO1-datalake"
+            }
+          ]
         },
         "RetryStrategy" : {
           "Attempts" : 1
