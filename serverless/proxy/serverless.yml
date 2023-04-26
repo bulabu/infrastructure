@@ -1,0 +1,29 @@
+frameworkVersion: '3'
+service: proxy
+
+provider:
+  name: aws
+  runtime: nodejs12.x
+
+functions:
+  content:
+    handler: handler.content
+    events:
+      - http:
+          path: content
+          method: get
+  submit:
+    handler: handler.submit
+    events:
+      - http:
+          path: submission
+          method: post
+plugins:
+  - serverless-domain-manager
+
+custom:
+  customDomain:
+    domainName: 'proxy.mukulsoundarajan.com' 
+    basePath: ''
+    stage: 'prod'
+    createRoute53Record: true
