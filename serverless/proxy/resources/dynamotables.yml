@@ -1,0 +1,56 @@
+Resources:
+  programsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: form_programs
+      AttributeDefinitions:
+        - AttributeName: institution
+          AttributeType: S
+#        - AttributeName: programs_json
+#          AttributeType: S
+#        - AttributeName: last_updated
+#          AttributeType: N
+      KeySchema:
+        - AttributeName: institution
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+  termsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: form_terms
+      AttributeDefinitions:
+        - AttributeName: institution
+          AttributeType: S
+#        - AttributeName: terms_json
+#          AttributeType: S
+#        - AttributeName: last_updated
+#          AttributeType: N
+      KeySchema:
+        - AttributeName: institution
+          KeyType: HASH
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
+  formDefinitionsTable:
+    Type: AWS::DynamoDB::Table
+    Properties:
+      TableName: form_form_definitions
+      AttributeDefinitions:
+        - AttributeName: institution
+          AttributeType: S
+        - AttributeName: form_id
+          AttributeType: S
+#        - AttributeName: form_definition
+#          AttributeType: S
+#        - AttributeName: last_updated
+#          AttributeType: N
+      KeySchema:
+        - AttributeName: institution
+          KeyType: HASH
+        - AttributeName: form_id
+          KeyType: RANGE
+      ProvisionedThroughput:
+        ReadCapacityUnits: 1
+        WriteCapacityUnits: 1
